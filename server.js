@@ -1,28 +1,28 @@
 import express from 'express';
 import cors from 'cors';
+import bcrypt from 'bcrypt-nodejs';
+import knex from 'knex';
 
-const database = {
-  users: [
-    {
-      id: '123',
-      name: 'John',
-      email: 'john@gmail.com',
-      password: 'cookies',
-      entries: 0,
-      joined: new Date()
-    },
-    {
-      id: '124',
-      name: 'Sally',
-      email: 'sally@gmail.com',
-      password: 'bananas',
-      entries: 0,
-      joined: new Date()
-    }
-  ]
-}
+import handleRegister from './controllers/register.js';
+import handleSignIn from './controllers/signin.js';
+import handleProfileGet from './controllers/profile.js';
+import { handleImage, handleApiCall } from './controllers/image.js';
+
+const db = knex({
+  client: 'pg',
+  connection: {
+    host : '127.0.0.1',
+    user : 'postgres',
+    password : '123',
+    database : 'smartbrain'
+  }
+});
 
 const app = express();
+const PORT = 3001;
+app.listen(PORT, () => {
+  console.log(`Listening on port ${PORT}`)
+});
 
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
@@ -32,57 +32,12 @@ app.get('/', (req, res) => {
   res.json(database.users);
 });
 
-app.post('/signin', (req, res) => {
-  if (req.body.email === database.users[0].email &&
-      req.body.password === database.users[0].password) {
-        res.json(database.users[0]);
-      } else {
-        res.status(400).json('Error logging in');
-      }
-});
+app.post('/signin', handleSignIn(db, bcrypt));
 
-app.post('/register', (req, res) => {
-  const { email, name, password } = req.body;
-  database.users.push({
-    id: '125',
-    name: name,
-    email: email,
-    password: password,
-    entries: 0,
-    joined: new Date()
-  });
-  res.json(database.users[database.users.length-1]);
-});
+app.post('/register', handleRegister(db, bcrypt));
 
-app.get('/profile/:id', (req, res) => {
-  const { id } = req.params;
-  let found = false;
-  for (const user of database.users) {
-    if (user.id === id) {
-      found = true;
-      return res.json(user);
-    }
-  }
-  if (!found) {
-    res.status(400).json('User not found');
-  }
-});
+app.get('/profile/:id', handleProfileGet(db));
 
-app.put('/image', (req, res) => {
-  const { id } = req.body;
-  let found = false;
-  for (const user of database.users) {
-    if (user.id === id) {
-      found = true;
-      user.entries++;
-      return res.json(user.entries);
-    }
-  }
-  if (!found) {
-    res.status(400).json('User not found');
-  }
-})
+app.post('/imageurl', handleApiCall());
 
-app.listen(3001, () => {
-  console.log('App is running on port 3001')
-})
+app.put('/image', handleImage(db));
